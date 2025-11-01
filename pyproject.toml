@@ -4,4 +4,40 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "mcp",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyright",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["server"]
+
+[tool.pyright]
+include = ["server", "*.py"]
+exclude = ["**/__pycache__", ".venv"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+pythonVersion = "3.12"

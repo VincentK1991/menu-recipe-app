@@ -1,19 +1,16 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import FastAPI
-
-# MCP (Model Context Protocol) SDK — FastMCP + HTTP transport
 from mcp.server.fastmcp import FastMCP
-from mcp.server.transport.http import create_http_app
+from starlette.applications import Starlette
 
 # ---- App + static demo data -------------------------------------------------
 
 mcp = FastMCP("menu-recipe-app")
 
 # Static demo menu items (POC)
-MENU: List[Dict[str, Any]] = [
+MENU: list[dict[str, Any]] = [
     {
         "id": "r1",
         "title": "Garlic Lemon Salmon",
@@ -119,13 +116,13 @@ def _ui_text(name: str) -> str:
 
 
 # Expose components as MCP resources so the Apps SDK can render them
-@mcp.resource(GALLERY_URI, mimeType=HTML_MIME)
-def _gallery_component():
+@mcp.resource(GALLERY_URI, mime_type=HTML_MIME)
+def _gallery_component() -> str:
     return _ui_text("dish-gallery.html")
 
 
-@mcp.resource(RECIPE_URI, mimeType=HTML_MIME)
-def _recipe_component():
+@mcp.resource(RECIPE_URI, mime_type=HTML_MIME)
+def _recipe_component() -> str:
     return _ui_text("recipe-card.html")
 
 
@@ -137,12 +134,12 @@ def _recipe_component():
     description="Find dishes by simple text/filters and return a clickable gallery.",
 )
 def search_dishes(
-    query: Optional[str] = None,
-    ingredients: Optional[List[str]] = None,
-    diet: Optional[str] = None,
-    cuisine: Optional[str] = None,
+    query: str | None = None,
+    ingredients: list[str] | None = None,
+    diet: str | None = None,
+    cuisine: str | None = None,
     max_results: int = 12,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     # For the POC we just filter the static list a tiny bit
     items = MENU
     if query:
@@ -150,11 +147,9 @@ def search_dishes(
         items = [i for i in items if q in i["title"].lower()]
     if ingredients:
         # extremely naive match against ingredient names
-        ing = set([s.lower() for s in ingredients])
+        ing = {s.lower() for s in ingredients}
         items = [
-            i
-            for i in items
-            if any(x["name"].lower() in ing for x in i["details"]["ingredients"])
+            i for i in items if any(x["name"].lower() in ing for x in i["details"]["ingredients"])
         ]
 
     items = items[:max_results]
@@ -181,7 +176,7 @@ def search_dishes(
     name="get_recipe",
     description="Return full recipe (ingredients, steps, nutrition, benefits) for a dish id.",
 )
-def get_recipe(recipe_id: str) -> Dict[str, Any]:
+def get_recipe(recipe_id: str) -> dict[str, Any]:
     rec = next((i for i in MENU if i["id"] == recipe_id), None)
     if not rec:
         return {
@@ -211,8 +206,8 @@ def get_recipe(recipe_id: str) -> Dict[str, Any]:
 # ------------- HTTP transport for ChatGPT Developer Mode -------------
 
 
-def build_app() -> FastAPI:
-    return create_http_app(mcp)
+def build_app() -> Starlette:
+    return mcp.streamable_http_app()
 
 
 app = build_app()
