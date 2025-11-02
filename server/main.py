@@ -2,12 +2,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
-from starlette.applications import Starlette
+from fastmcp import FastMCP
 
 # ---- App + static demo data -------------------------------------------------
 
-mcp = FastMCP("menu-recipe-app")
+mcp = FastMCP(name="RecipeBook")
 
 # Static demo menu items (POC)
 MENU: list[dict[str, Any]] = [
@@ -106,24 +105,33 @@ MENU: list[dict[str, Any]] = [
 ]
 
 # UI component resource identifiers and MIME
-GALLERY_URI = "ui://dish-gallery.html"
-RECIPE_URI = "ui://recipe-card.html"
+GALLERY_URI = "ui://dish-gallery"
+RECIPE_URI = "ui://recipe-card"
 HTML_MIME = "text/html+skybridge"
 
 
-def _ui_text(name: str) -> str:
-    return Path(__file__).parent.joinpath("ui", name).read_text(encoding="utf-8")
+def _read_dist_html(name: str) -> str:
+    """Read compiled React widget from Vite build output."""
+    widget_path = Path(__file__).parent.joinpath("ui-widget", "dist", f"{name}.html")
+    if not widget_path.exists():
+        raise FileNotFoundError(
+            f"Widget not found: {widget_path}. "
+            "Run 'cd server/ui-widget && npm install && npm run build' first."
+        )
+    return widget_path.read_text(encoding="utf-8")
 
 
 # Expose components as MCP resources so the Apps SDK can render them
 @mcp.resource(GALLERY_URI, mime_type=HTML_MIME)
-def _gallery_component() -> str:
-    return _ui_text("dish-gallery.html")
+def dish_gallery_widget() -> str:
+    """Serve the compiled React gallery widget."""
+    return _read_dist_html("index")
 
 
 @mcp.resource(RECIPE_URI, mime_type=HTML_MIME)
-def _recipe_component() -> str:
-    return _ui_text("recipe-card.html")
+def recipe_card_widget() -> str:
+    """Serve the compiled React recipe card widget (future: separate build)."""
+    return _read_dist_html("index")
 
 
 # ----------------------- Tools -----------------------
@@ -141,19 +149,25 @@ def search_dishes(
     cuisine: str | None = None,
     max_results: int = 12,
 ) -> dict[str, Any]:
-    # For the POC we just filter the static list a tiny bit
+    """
+    Search for dishes matching the given criteria.
+    Returns a structured response that will be passed to the React widget as props.
+    """
+    # For the POC we just filter the static list
     items = MENU
     if query:
         q = query.lower()
         items = [i for i in items if q in i["title"].lower()]
     if ingredients:
-        # extremely naive match against ingredient names
+        # Extremely naive match against ingredient names
         ing = {s.lower() for s in ingredients}
         items = [
             i for i in items if any(x["name"].lower() in ing for x in i["details"]["ingredients"])
         ]
 
     items = items[:max_results]
+
+    # Return shape becomes the widget props directly
     return {
         "items": [
             {
@@ -164,7 +178,6 @@ def search_dishes(
             }
             for i in items
         ],
-        # Optional: short text for the chat transcript
         "content": f"Found {len(items)} dishes.",
     }
 
@@ -175,15 +188,21 @@ def search_dishes(
     meta={"openai/outputTemplate": RECIPE_URI},
 )
 def get_recipe(recipe_id: str) -> dict[str, Any]:
+    """
+    Get full recipe details by ID.
+    Returns a structured response that will be passed to the React widget as props.
+    """
     rec = next((i for i in MENU if i["id"] == recipe_id), None)
     if not rec:
+        # Return error state
         return {
             "content": "Recipe not found.",
-            "structured_content": {"error": "not_found", "recipe_id": recipe_id},
-            "_meta": {"openai/outputTemplate": RECIPE_URI},
+            "error": "not_found",
+            "recipe_id": recipe_id,
         }
 
-    payload = {
+    # Return shape becomes the widget props directly
+    return {
         "id": rec["id"],
         "title": rec["title"],
         "imageUrl": rec["details"]["imageUrl"],
@@ -192,26 +211,17 @@ def get_recipe(recipe_id: str) -> dict[str, Any]:
         "nutrition": rec["details"]["nutrition"],
         "benefits": rec["details"]["benefits"],
         "tags": rec["details"]["tags"],
-    }
-
-    return {
         "content": f"Recipe for {rec['title']}",
-        "structured_content": payload,
-        "_meta": {"openai/outputTemplate": RECIPE_URI},
     }
 
 
 # ------------- HTTP transport for ChatGPT Developer Mode -------------
 
-
-def build_app() -> Starlette:
-    return mcp.streamable_http_app()
-
-
-app = build_app()
-
-
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+    # Run the MCP server with streamable HTTP transport
+    # The FastMCP library handles the Starlette app creation
+    port = int(os.getenv("PORT", "8080"))
+    print(f"Starting RecipeBook MCP server on http://0.0.0.0:{port}/mcp")
+    print("Make sure to build the React widgets first:")
+    print("  cd server/ui-widget && npm install && npm run build")
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path="/mcp")
