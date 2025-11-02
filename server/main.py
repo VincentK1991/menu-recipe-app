@@ -162,13 +162,11 @@ def search_dishes(
         # Extremely naive match against ingredient names
         ing = {s.lower() for s in ingredients}
         items = [
-            i
-            for i in items
-            if any(x["name"].lower() in ing for x in i["details"]["ingredients"])
+            i for i in items if any(x["name"].lower() in ing for x in i["details"]["ingredients"])
         ]
 
     items = items[:max_results]
-    
+
     # Return shape becomes the widget props directly
     return {
         "items": [
@@ -220,10 +218,10 @@ def get_recipe(recipe_id: str) -> dict[str, Any]:
 # ------------- HTTP transport for ChatGPT Developer Mode -------------
 
 if __name__ == "__main__":
-    # Run the MCP server with HTTP transport
+    # Run the MCP server with streamable HTTP transport
     # The FastMCP library handles the Starlette app creation
     port = int(os.getenv("PORT", "8080"))
-    print(f"Starting RecipeBook MCP server on http://0.0.0.0:{port}")
+    print(f"Starting RecipeBook MCP server on http://0.0.0.0:{port}/mcp")
     print("Make sure to build the React widgets first:")
     print("  cd server/ui-widget && npm install && npm run build")
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path="/mcp")
