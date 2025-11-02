@@ -132,6 +132,7 @@ def _recipe_component() -> str:
 @mcp.tool(
     name="search_dishes",
     description="Find dishes by simple text/filters and return a clickable gallery.",
+    meta={"openai/outputTemplate": GALLERY_URI},
 )
 def search_dishes(
     query: str | None = None,
@@ -153,28 +154,25 @@ def search_dishes(
         ]
 
     items = items[:max_results]
-
-    # Shape required by Apps SDK: include structured_content and outputTemplate
     return {
+        "items": [
+            {
+                "id": i["id"],
+                "title": i["title"],
+                "imageUrl": i["imageUrl"],
+                "quickFacts": i["quickFacts"],
+            }
+            for i in items
+        ],
+        # Optional: short text for the chat transcript
         "content": f"Found {len(items)} dishes.",
-        "structured_content": {
-            "items": [
-                {
-                    "id": i["id"],
-                    "title": i["title"],
-                    "imageUrl": i["imageUrl"],
-                    "quickFacts": i["quickFacts"],
-                }
-                for i in items
-            ]
-        },
-        "_meta": {"openai/outputTemplate": GALLERY_URI},
     }
 
 
 @mcp.tool(
     name="get_recipe",
     description="Return full recipe (ingredients, steps, nutrition, benefits) for a dish id.",
+    meta={"openai/outputTemplate": RECIPE_URI},
 )
 def get_recipe(recipe_id: str) -> dict[str, Any]:
     rec = next((i for i in MENU if i["id"] == recipe_id), None)
