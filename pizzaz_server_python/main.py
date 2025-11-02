@@ -292,6 +292,35 @@ mcp._mcp_server.request_handlers[types.ReadResourceRequest] = _handle_read_resou
 
 app = mcp.streamable_http_app()
 
+# Add static file serving middleware BEFORE other middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse
+import os
+import re
+
+class StaticFilesMiddleware(BaseHTTPMiddleware):
+    """Middleware to serve static files from assets directory."""
+
+    # Pattern to match static file extensions
+    STATIC_FILE_PATTERN = re.compile(
+        r'.*\.(js|css|html|map|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$',
+        re.IGNORECASE
+    )
+
+    async def dispatch(self, request, call_next):
+        # Check if this is a request for a static file
+        path = request.url.path.lstrip('/')
+
+        if self.STATIC_FILE_PATTERN.match(path):
+            file_path = os.path.join(ASSETS_DIR, path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+
+        # Not a static file or doesn't exist, pass to next handler
+        return await call_next(request)
+
+app.add_middleware(StaticFilesMiddleware)
+
 try:
     from starlette.middleware.cors import CORSMiddleware
 

@@ -165,18 +165,22 @@ console.log("new hash: ", h);
 const defaultBaseUrl = "http://localhost:4444";
 const baseUrlCandidate = process.env.BASE_URL?.trim() ?? "";
 const baseUrlRaw = baseUrlCandidate.length > 0 ? baseUrlCandidate : defaultBaseUrl;
-const normalizedBaseUrl = baseUrlRaw.replace(/\/+$/, "") || defaultBaseUrl;
-console.log(`Using BASE_URL ${normalizedBaseUrl} for generated HTML`);
+// Support "." or "./" to indicate relative paths
+const useRelativePaths = baseUrlRaw === "." || baseUrlRaw === "./";
+const normalizedBaseUrl = useRelativePaths ? "" : (baseUrlRaw.replace(/\/+$/, "") || defaultBaseUrl);
+console.log(`Using BASE_URL ${normalizedBaseUrl || "(relative paths)"} for generated HTML`);
 
 for (const name of builtNames) {
   const dir = outDir;
   const hashedHtmlPath = path.join(dir, `${name}-${h}.html`);
   const liveHtmlPath = path.join(dir, `${name}.html`);
+  const jsUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/${name}-${h}.js` : `./${name}-${h}.js`;
+  const cssUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/${name}-${h}.css` : `./${name}-${h}.css`;
   const html = `<!doctype html>
 <html>
 <head>
-  <script type="module" src="${normalizedBaseUrl}/${name}-${h}.js"></script>
-  <link rel="stylesheet" href="${normalizedBaseUrl}/${name}-${h}.css">
+  <script type="module" src="${jsUrl}"></script>
+  <link rel="stylesheet" href="${cssUrl}">
 </head>
 <body>
   <div id="${name}-root"></div>
